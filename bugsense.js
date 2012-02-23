@@ -1,133 +1,104 @@
 Bugsense = {
-  notify: function(notice) {
-
-    var that    = this;
-    this.notice = notice;
-    this.status = ( this.notice && this.notice.request && this.notice.request.status ).toString();
-    this.errors = ( this.notice && this.notice.request && this.notice.request.errors );
-    var res     = this.notice.request || { message: 'Unknown Error' };
-    var stack   = ( this.notice.response && this.notice.response.stack );
-
-    // filter out some errors (e.g. 404, 422,…)
-    if (this.errorFilters()) {
-      return;
-    }
-
-    // bugsense parameters (required)
-    this.defaults = {
-      apiKey: 'FOOBAR', // modify me
-      url: 'https://bugsense.appspot.com/api/errors?api_key=' // SSL
-      // url: 'http://www.bugsense.com/api/js/errors?api_key=' // NON-SSL
-    };
-
-    this.data = {
-
-      // basic data (required)
-      application_environment: {
-        environment: 'development', // modify me if you like
-        // TODO: find a way to detect the mobile device, maybe with WURFL or so…?
-        appver: window.navigator.userAgent || 'unknown',
-        osver: window.navigator.oscpu || 'unknown'
-      },
-
-      // bugsense client
-      client: {
-        name : 'SC Mobile Bugsense Notifier',
-        protocol_version: 1,
-        version: '0.1'
-      },
-
-      // basics about the exception
-      exception: {
-        klass: ( that.notice.settings && that.notice.settings.modelType ) || 'Unknown Component',
-        message: that.notice.error || res.message,
-        backtrace: that.generateBackTrace(stack),
-        where:"n/a:0" // can't take this out or the API breaks.
-      },
-
-      // details & custom data about the exception including url, request, response,…
-      request: (function() {
-        var request = {
-          // Collecting IPs is illegal in some countries that's why we don't do it, if you'd like to, just remove this ligne
-          remote_ip: '0.0.0.0',
-          url: window.location.href,
-          custom_data: {
-            // You can remove & add custom data here from session/localStorage, cookies, geolocation, language, mimetypes,…
-            document_referrer    : that.escapeText(document.referrer),
-            http_status          : that.escapeText(this.status),
-            navigator_user_agent : that.escapeText(navigator.userAgent),
-            navigator_platform   : that.escapeText(navigator.platform),
-            navigator_vendor     : that.escapeText(navigator.vendor),
-            navigator_language   : that.escapeText(navigator.language),
-            screen_width         : that.escapeText(screen.width),
-            screen_height        : that.escapeText(screen.height),
-            response             : that.escapeText(that.notice.request.responseText),
-            request              : {}
-          }
+    notify: function (b) {
+        var e = this;
+        this.notice = b;
+        this.status = (this.notice && this.notice.request && this.notice.request.status).toString();
+        this.errors = this.notice && this.notice.request && this.notice.request.errors;
+        b = this.notice.request || {
+            message: "Unknown Error"
         };
-        if (that.notice.settings) {
-          var req = that.notice.settings;
-          _.each(req, function(value, key) {
-            // whitelist to avoid functions
-            if (/boolean|number|string/.test($.type(value))) {
-              request.custom_data.request[key] = value;
-            }
-          });
+        var h = this.notice.response && this.notice.response.stack;
+        this.defaults = {
+            apiKey: "<insert_you_bugsense_key>",
+            url: "https://bugsense.appspot.com/api/errors?api_key="
+        };
+
+        this.data = {
+          application_environment: {
+              appver: window.navigator.userAgent || "unknown",
+              osver: window.navigator.oscpu || "unknown"
+          },
+          client: {
+              name: "Blossom Bugsense Notifier",
+              protocol_version: 1,
+              version: "0.1"
+          },
+          exception: {
+              klass: e.notice.settings && e.notice.settings.modelType || "Unknown Component",
+              message: e.notice.error || b.message,
+              backtrace: e.generateBackTrace(h),
+              where: "n/a:0"
+          },
+          request: function () {
+              var k = {
+                  remote_ip: "0.0.0.0",
+                  url: window.location.href,
+                  custom_data: {
+                      document_referrer: e.escapeText(document.referrer),
+                      http_status: e.escapeText(this.status),
+                      navigator_user_agent: e.escapeText(navigator.userAgent),
+                      navigator_platform: e.escapeText(navigator.platform),
+                      navigator_vendor: e.escapeText(navigator.vendor),
+                      navigator_language: e.escapeText(navigator.language),
+                      screen_width: e.escapeText(screen.width),
+                      screen_height: e.escapeText(screen.height),
+                      response: e.escapeText(e.notice.request.responseText),
+                      request: {}
+                  }
+              };
+              e.notice.settings && _.each(e.notice.settings, function (t, x) {
+                  if (/boolean|number|string/.test($.type(t))) k.custom_data.request[x] = t
+              });
+              k.custom_data.request = JSON.stringify(k.custom_data.request);
+              return k
+          }()
         }
-        // stringify it
-        request.custom_data.request = JSON.stringify(request.custom_data.request);
-        return request;
-      }())
+        b = this.defaults.url + this.defaults.apiKey + "&data=" + escape(JSON.stringify(this.data));
+        $("#bugsense-iframe")[0] ? $("#bugsense-iframe").attr("src", b) : $("body").append('<iframe id="bugsense-iframe" src="' + b + '" width="1" height="1">');
+    },
+    errorFilters: function () {
+        return false;
+    },
+    escapeText: function (b) {
+        if(typeof(b) !== "undefined" && b !== null) {
+          b = b.toString() || "";
+          return b.replace(/&/g, "&#38;").replace(/</g, "&#60;").replace(/>/g, "&#62;").replace(/'/g, "&#39;").replace(/"/g, "&#34;");
+        } else {
+          return undefined;
+        }
+    },
+    generateBackTrace: function (b) {
+        if (b) return b.file + ":" + b.line;
+        try {
+            throw Error();
+        } catch (e) {
+            if (e.stack) {
+                var h = /\s+at\s(.+)\s\((.+?):(\d+)(:\d+)?\)/;
+                return $.map(e.stack.split("\n").slice(4), _.bind(function (k) {
+                    k = k.match(h);
+                    var t = this.escapeText(k[1]);
+                    return this.escapeText(k[2]) + ":" + k[3] + "in" + t
+                }, this)).join("\n")
+            } else if (e.sourceURL) return e.sourceURL + ":" + e.line
+        }
+        return "n/a:0"
+    }
+};
 
-    };
-
-    // all ready? lets make a get request with the data
-    if (this.data && this.defaults.url && this.defaults.apiKey) {
-      var url = this.defaults.url + this.defaults.apiKey + '&data=' + escape( JSON.stringify(this.data) );
-      if ($('#bugsense-iframe')[0]) {
-        $('#bugsense-iframe').attr('src', url);
-      } else {
-        $('body').append('<iframe id="bugsense-iframe" src="' + url + '" width="1" height="1">');
+window.onerror = function (message, file, line) {
+  setTimeout(function () {
+    Bugsense.notify({
+      request: {
+        message: message,
+        status: "uncatched-error"
+      },
+      response: {
+        stack: {
+          file: file,
+          line: line
+        }
       }
-    }
-  },
-  errorFilters: function() {
-    return _.any([
-      // not found
-      this.status === '404',
-      // add whatever you want in here
-    ]);
-  },
-  escapeText: function(text) {
-    text = text.toString() || '';
-    return text.replace(/&/g, '&#38;')
-               .replace(/</g, '&#60;')
-               .replace(/>/g, '&#62;')
-               .replace(/'/g, '&#39;')
-               .replace(/"/g, '&#34;');
-  },
-  generateBackTrace: function(stack) {
-    if (stack) {
-      return stack.file + ':' + stack.line;
-    }
-    try {
-      throw new Error();
-    } catch (e) {
-      if (e.stack) {
-        var matcher = /\s+at\s(.+)\s\((.+?):(\d+)(:\d+)?\)/;
-        return $.map(e.stack.split("\n").slice(4), _.bind(function(line) {
-          var match  = line.match(matcher);
-          var method = escapeText(match[1]);
-          var file   = escapeText(match[2]);
-          var number = match[3];
-          return file + ':' + number + 'in' + method;
-        }, this)).join("\n");
-      } else if (e.sourceURL) {
-        // note: this is completely useless, as it just points back at itself but is needed on Safari
-        // keeping it around in case they ever end up providing actual stacktraces
-        return e.sourceURL + ':' + e.line;
-      }
-    }
-    return 'n/a:0';
-  }
+    })
+  }, 100);
+  return true
 };
